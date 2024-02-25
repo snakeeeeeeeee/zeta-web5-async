@@ -25,10 +25,18 @@ with open("proxies.txt", "r") as p:
         proxy = proxy.strip()
         proxies.append(proxy)
 '''
-workflow = [3, 4, 6, 7, 8, 9, 6, 5, 11, 10]
+# workflow = [3, 4, 6, 7, 8, 9, 10, 11]
 
 
-# workflow = [1,2]
+# workflow = [1, 5]
+
+workflow = [2]
+
+suc_private_keys = []
+with open("success_keys.txt", "r") as f:
+    for line in f:
+        line = line.strip()
+        suc_private_keys.append(line)
 
 
 def run_sync_in_executor(func, *args):
@@ -62,6 +70,8 @@ async def handle_transaction(semaphore, key, workflow):
                 await asyncio.sleep(3)
                 with open("fail_logs.txt", "a") as log_file:
                     log_file.write(error_message + f" ")
+        with open("success_keys.txt", "a") as suc_file:
+            suc_file.write(key + "\n")
 
 
 async def async_run(private_keys, workflow):
@@ -69,6 +79,9 @@ async def async_run(private_keys, workflow):
     semaphore = asyncio.Semaphore(20)
     tasks = []
     for key in private_keys:
+        # if successful, continue
+        if key in suc_private_keys:
+            continue
         task = asyncio.create_task(handle_transaction(semaphore, key, workflow))
         tasks.append(task)
     await asyncio.gather(*tasks)

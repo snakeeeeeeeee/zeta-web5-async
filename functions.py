@@ -26,8 +26,10 @@ from config import (
     zeta_value_bnb,
 )
 
+tmpWeb3 = Web3()
 
-def retry(tries=3, delay=3, backoff=1):
+
+def retry(tries=2, delay=3, backoff=1):
     def decorator_retry(func):
         @functools.wraps(func)
         def wrapper_retry(*args, **kwargs):
@@ -36,17 +38,19 @@ def retry(tries=3, delay=3, backoff=1):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    print(f"Caught '{e}', retrying in {mdelay} seconds...")
+                    print(f"Retry for '{e}'")
                     time.sleep(mdelay)
                     mtries -= 1
                     mdelay *= backoff
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                error_message = f"Function '{func.__name__}' failed after {tries} attempts: {e}\n"
-                print(error_message)
+                private_key = kwargs.get('private_key', None)
+                error_message = f"Function [{func.__name__}] failed, errMsg: [{e}]"
+                if private_key:
+                    error_message += f" Address: {tmpWeb3.eth.account.from_key(private_key).address}, privateKey: {private_key}"
                 with open("fail_logs.txt", "a") as log_file:
-                    log_file.write(error_message)
+                    log_file.write(error_message + "\n")
                 raise
 
         return wrapper_retry
@@ -54,11 +58,31 @@ def retry(tries=3, delay=3, backoff=1):
     return decorator_retry
 
 
+def aop_log(func):
+    @functools.wraps(func)
+    def wrapper_log(*args, **kwargs):
+        start_time = time.time()
+        try:
+            result = func(*args, **kwargs)
+        except Exception as e:
+            end_time = time.time()
+            print(f"Function '{func.__name__}' raised an exception: {e}. "
+                  f"Execution time: {end_time - start_time:.8f} seconds.")
+            raise
+        end_time = time.time()
+        # 打印函数信息和执行时间
+        print(f"Function '{func.__name__}' executed successfully in {end_time - start_time:.8f} seconds.")
+        return result
+
+    return wrapper_log
+
+
 def current_time():
     cur_time = time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
     return cur_time
 
 
+@retry()
 def get_proxy(nstproxy_Channel="xx", nstproxy_Password="xx"):
     session = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(10))
     proxy = f"http://{nstproxy_Channel}-residential-country_ANY-r_5m-s_{session}:{nstproxy_Password}@gw-us.nstproxy.com:24125"
@@ -131,11 +155,11 @@ def enroll(private_key: str, proxy=None) -> str:
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        #time.sleep(transactions_break_time)
         return
 
     print(f"{current_time()} | Enroll (register) hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    #time.sleep(transactions_break_time)
 
 
 @retry()
@@ -164,10 +188,12 @@ def enroll_verify(private_key: str, proxy=None):
     if response.status_code == 200:
         response = response.json()
         print(f"{current_time()} | Verify status: {response['isUserVerified']}")
-        time.sleep(enroll_verify_time)
+        # time.sleep(enroll_verify_time)
     else:
         print(f"{current_time()} | Error status code: {response.status_code}")
-        time.sleep(enroll_verify_time)
+        with open("enroll_verify_fail.txt", "a") as log_file:
+            log_file.write(private_key + "\n")
+        # time.sleep(enroll_verify_time)
 
 
 @retry()
@@ -189,9 +215,9 @@ def transfer(private_key: str, proxy=None) -> str:
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        # time.sleep(transactions_break_time)
     print(f"{current_time()} | Send & Receive TX hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    # time.sleep(transactions_break_time)
 
 
 @retry()
@@ -215,9 +241,9 @@ def bsc_quest(private_key: str, proxy=None) -> str:
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        # time.sleep(transactions_break_time)
     print(f"{current_time()} | Receive BNB from BSC TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    # time.sleep(transactions_break_time)
 
 
 @retry()
@@ -248,10 +274,10 @@ def check_user_points(private_key: str, proxy=None):
         print(
             f'Address: {account.address}\nRank: {response["rank"]}\nLevel: {response["level"]}\nTotal XP: {response["totalXp"]}\n-----------------'
         )
-        time.sleep(check_user_points_time)
+        # time.sleep(check_user_points_time)
     else:
         print(f"{current_time()} | Error: {response.json()}\n----------------")
-        time.sleep(check_user_points_time)
+        # time.sleep(check_user_points_time)
 
 
 @retry()
@@ -281,7 +307,7 @@ def check_tasks(private_key: str, proxy=None):
         for task, task_data in check_resp["xpRefreshTrackingByTask"].items():
             if task_data["hasXpToRefresh"]:
                 quests_to_refresh.append(task)
-    time.sleep(check_tasks_time)
+    #time.sleep(check_tasks_time)
 
     return quests_to_refresh
 
@@ -294,7 +320,7 @@ def claim_tasks(private_key: str, proxy=None):
 
     if quest_list == []:
         print(f"{current_time()} | Nothing to claim for address {account.address}")
-        time.sleep(claim_tasks_time)
+        #time.sleep(claim_tasks_time)
         return
 
     for quest in quest_list:
@@ -318,10 +344,9 @@ def claim_tasks(private_key: str, proxy=None):
             json=claim_data,
             proxies=create_proxy(proxy),
         )
-        response = response.json()
 
         print(f"{current_time()} | Claimed {quest} for address {account.address}")
-        time.sleep(claim_tasks_time)
+        # time.sleep(claim_tasks_time)
 
 
 @retry()
@@ -338,7 +363,7 @@ def pool_tx(private_key: str, proxy=None):
         0,
         0,
         account.address,
-        web3.eth.get_block("latest").timestamp + 3600,
+        web3.eth.get_block("latest").timestamp + 36000,
     ).build_transaction(
         {
             "from": account.address,
@@ -355,9 +380,9 @@ def pool_tx(private_key: str, proxy=None):
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        # time.sleep(transactions_break_time)
     print(f"{current_time()} | Pool deposit TX hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    # time.sleep(transactions_break_time)
 
 
 @retry()
@@ -387,9 +412,9 @@ def approve(private_key: str, proxy=None):
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        #time.sleep(transactions_break_time)
     print(f"{current_time()} | Approve hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    # time.sleep(transactions_break_time)
 
 
 @retry()
@@ -435,9 +460,9 @@ def btc_quest(private_key: str, proxy=None):
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        # time.sleep(transactions_break_time)
     print(f"{current_time()} | Receive BTC TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    # time.sleep(transactions_break_time)
 
 
 @retry()
@@ -484,9 +509,9 @@ def eth_quest(private_key: str, proxy=None):
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        # time.sleep(transactions_break_time)
     print(f"{current_time()} | Receive ETH TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    # time.sleep(transactions_break_time)
 
 
 @retry()
@@ -533,6 +558,6 @@ def bsc_izumi_quest(private_key: str, proxy=None):
     receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
     if receipt.status != 1:
         print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
+        # time.sleep(transactions_break_time)
     print(f"{current_time()} | Receive BNB TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    # time.sleep(transactions_break_time)
