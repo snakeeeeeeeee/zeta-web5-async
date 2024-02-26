@@ -349,7 +349,7 @@ def claim_tasks(private_key: str, proxy=None):
         # time.sleep(claim_tasks_time)
 
 
-@retry()
+@retry(tries=5, delay=3, backoff=1)
 def pool_tx(private_key: str, proxy=None):
     web3 = create_web3_with_proxy(RPC, proxy)
     contract = web3.eth.contract(
@@ -363,7 +363,7 @@ def pool_tx(private_key: str, proxy=None):
         0,
         0,
         account.address,
-        web3.eth.get_block("latest").timestamp + 36000,
+        web3.eth.get_block("latest").timestamp + 3600,
     ).build_transaction(
         {
             "from": account.address,

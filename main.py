@@ -25,12 +25,24 @@ with open("proxies.txt", "r") as p:
         proxy = proxy.strip()
         proxies.append(proxy)
 '''
-# workflow = [3, 4, 6, 7, 8, 9, 10, 11]
+
+'''
+以下三个flow是每一个账号必须要做的，建议分开单独执行:
+workflow = [1] # 认证账号
+workflow = [2] # 查询授权是否成功, 未成功的将写入文件: enroll_verify_fail.txt
+workflow = [5] # 单独授权 pool_tx
 
 
-# workflow = [1, 5]
+以下是完成任务:
+workflow = [3, 4, 6, 7, 8, 9] # 执行获取xp任务
+workflow = [10] # 单独领取奖励
+workflow = [11] # 查询账号的xp奖励(可以不查)
 
-workflow = [2]
+每次执行成功的key会写入success_keys.txt中，下次执行会跳过。重复执行的时候根据需要看是否要清除掉。
+
+'''
+
+workflow = [3, 4, 6, 7, 8, 9]
 
 suc_private_keys = []
 with open("success_keys.txt", "r") as f:
@@ -67,16 +79,13 @@ async def handle_transaction(semaphore, key, workflow):
             except Exception as e:
                 error_message = f"Error for address: {web3.eth.account.from_key(key).address} | Error: {e}\n"
                 print(error_message)
-                await asyncio.sleep(3)
-                with open("fail_logs.txt", "a") as log_file:
-                    log_file.write(error_message + f" ")
         with open("success_keys.txt", "a") as suc_file:
             suc_file.write(key + "\n")
 
 
 async def async_run(private_keys, workflow):
     # async core num
-    semaphore = asyncio.Semaphore(20)
+    semaphore = asyncio.Semaphore(128)
     tasks = []
     for key in private_keys:
         # if successful, continue

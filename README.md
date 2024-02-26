@@ -95,3 +95,23 @@ Solute To Russian Friends！Nice guys!
 1. 在functions.py中的get_proxy函数注意要自己去购买一个代理，或者实现自己的代理，购买链接：https://app.nstproxy.com/register?i=OkMHd2
 2. main.py的asyncio.Semaphore(20) 是代理池大小，可以自己修改，最好不要太高，失败率会显著增加
 3. functions.py中的retry函数控制重试次数，可以根据自己的网络情况修改
+
+## 注意点
+
+
+```text
+以下三个flow是每一个账号必须要做的，建议分开单独执行:
+workflow = [1] // 认证账号
+workflow = [2] // 查询授权是否成功, 未成功的将写入文件: enroll_verify_fail.txt
+workflow = [5] // 单独授权 pool_tx
+
+
+以下是完成任务:
+workflow = [3, 4, 6, 7, 8, 9] // 执行获取xp任务
+workflow = [10] // 单独领取奖励
+workflow = [11] // 查询账号的xp奖励(可以不查)
+
+每次执行成功的key会写入success_keys.txt中，下次执行会跳过。重复执行的时候根据需要看是否要清除掉。
+
+
+```
